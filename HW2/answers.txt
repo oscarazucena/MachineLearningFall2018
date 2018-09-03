@@ -1,0 +1,15 @@
+Answer 1:
+Measurement update, Variance sigma^2 of new Gaussian is
+Smaller than original Gaussian
+Answer 2:
+Measurment Upddate u,sigma for prior and measurement
+Posterior is v^2 = 0.5*sigma^2
+Answer 3:
+Is it possible to represent function as a Gaussian?
+No
+Answer 4:
+Dimension of state vector?
+4
+Answer 5:
+Write state transion matrix for 2D space:
+F = [[1, 0, 0.1, 0], [0, 1, 0, 0.1], [0, 0, 1, 0], [0, 0, 0, 1]]
