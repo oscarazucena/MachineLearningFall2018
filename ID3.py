@@ -17,7 +17,7 @@ class TestOperator:
         if self.operator == TEST.EQUAL:
             return value == self.value
         if self.operator == TEST.LESS:
-            return value < self.value
+            return value <= self.value
         return value > self.value
 
 class Test:
@@ -73,8 +73,6 @@ class TreeNode:
         return self.label
 
 
-
-
 class ID3Tree:
     # ID3Tree class implementation of ID3 decision tree
 
@@ -122,15 +120,7 @@ class ID3Tree:
             return TreeNode(target_attribute,attribute_value, max_key)
 
         #determine with attribute to split on
-        attribute_to_split_on = None
-        max_gain = -1.0
-        numeric = False
-        for attribute in attributes:
-            gain = self.get_gain(examples, attribute, attributes[attribute])
-            #print('{} {}:{}'.format(attribute, "gain", gain))
-            if gain > max_gain:
-                max_gain = gain
-                attribute_to_split_on = attribute
+        attribute_to_split_on = self.find_attribute_to_split_on(attributes,examples)
 
         values_to_split_on = attributes[attribute_to_split_on]
 
@@ -148,6 +138,17 @@ class ID3Tree:
 
         return node
 
+    def find_attribute_to_split_on(self, attributes, examples):
+        attribute_to_split_on = None
+        max_gain = -1.0
+        for attribute in attributes:
+            gain = self.get_gain(examples, attribute, attributes[attribute])
+            #print('{} {}:{}'.format(attribute, "gain", gain))
+            if gain > max_gain:
+                max_gain = gain
+                attribute_to_split_on = attribute
+
+        return attribute_to_split_on
     def get_gain_from_best_partition(self, attribute, examples):
         df = examples.sort_values(attribute)
         data_array = df[self.target_column].tolist()
