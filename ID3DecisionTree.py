@@ -2,6 +2,7 @@ import pandas as pd
 import ID3 as ID3
 import numpy as np
 import matplotlib.pyplot as plt
+import Booster as bs
 
 
 def find_nearest(clusters,value):
@@ -192,9 +193,7 @@ for depth in range(8):
 
 
 titanic_train_tree = max_tree
-graph = titanic_train_tree.get_graph("titanic_train_tree.png")
 
-graph.view()
 
 print('{}: {}'.format("Un-pruned number of nodes",titanic_train_tree.get_number_of_nodes()))
 print('{}: {}'.format("Un-pruned max depth",titanic_train_tree.get_max_depth()))
@@ -209,11 +208,26 @@ print('{}: {}'.format("Pruned max depth",titanic_train_tree.get_max_depth()))
 prune_percent_accuracy = get_percent_accuracy_from_tree(titanic_train_tree, titanic_test_all)
 print('{}: {}'.format("pruting_percent_accuracy",prune_percent_accuracy))
 
-graph_2 = titanic_train_tree.get_graph("titanic_train_tree_2.png")
 
+
+for i in range(10):
+    boosted_tree = bs.ID3BoostTree(attributes,target,survived[0],survived[1],"titanic_train",i)
+    boosted_tree.fit(titanic_train)
+
+    boosted_percent_accuracy = get_percent_accuracy_from_tree(boosted_tree, titanic_test_all)
+    print('{}: {}'.format("boosted_percent_accuracy",boosted_percent_accuracy))
+    print('{}: {}'.format("boosted_percent_tree_count",len(boosted_tree.trees)))
+    print('{}'.format("alphas"))
+    print(boosted_tree.alphas)
+
+graph = titanic_train_tree.get_graph("titanic_train_tree.png")
+graph.view()
+
+graph_2 = titanic_train_tree.get_graph("titanic_train_tree_2.png")
 graph_2.view()
 
 plt.style.use('seaborn-whitegrid')
 plt.plot(tree_depths, tree_train_percent, '-o', color='blue',label='Train % Accuracy')
 plt.plot(tree_depths, tree_test_percent, '-+', color='red',label='Test % Accuracy')
 plt.show()
+
