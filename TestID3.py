@@ -2,6 +2,11 @@ import ID3 as ID3
 import numpy as np
 import pandas as pd
 
+from sklearn.externals.six import StringIO
+from IPython.display import Image
+from sklearn.tree import export_graphviz
+import pydotplus
+
 def get_x_and_y_or_z(x,y,z):
     return (x and y) or z
 
@@ -35,16 +40,16 @@ for column in columns:
         print('{}:{}'.format(column, values))
 
 
-and_tree = ID3.ID3Tree(and_df,attributes,target,positive,negative,"and")
-and_tree.train()
+and_tree = ID3.ID3Tree(attributes,target,positive,negative,"and")
+and_tree.fit(and_df)
 and_tree.print()
 
-or_tree = ID3.ID3Tree(or_df,attributes,target,positive,negative,"or")
-or_tree.train()
+or_tree = ID3.ID3Tree(attributes,target,positive,negative,"or")
+or_tree.fit(or_df)
 or_tree.print()
 
-xor_tree = ID3.ID3Tree(xor_df,attributes,target,positive,negative,"xor")
-xor_tree.train()
+xor_tree = ID3.ID3Tree(attributes,target,positive,negative,"xor")
+xor_tree.fit(xor_df)
 xor_tree.print()
 
 trees = [and_tree,or_tree,xor_tree]
@@ -77,10 +82,13 @@ for column in columns:
         attributes[column] = values
         print('{}:{}'.format(column, values))
 
-x_and_y_or_z_tree = ID3.ID3Tree(x_and_y_or_z_df,attributes,target,positive,negative,"x_and_y_or_z")
-x_and_y_or_z_tree.train()
+x_and_y_or_z_tree = ID3.ID3Tree(attributes,target,positive,negative,"x_and_y_or_z")
+x_and_y_or_z_tree.fit(x_and_y_or_z_df)
 x_and_y_or_z_tree.print()
 
+
+x_and_y_or_z_tree_node_copy = x_and_y_or_z_tree.copy()
+print(x_and_y_or_z_tree_node_copy.to_string())
 
 sequence_test = [0, 0, 0, 1, 0, 0,0 ,1 , 1, 1, 1]
 
@@ -88,3 +96,9 @@ running_sequences = ID3.find_running_sequences(sequence_test)
 
 print('{}: {}'.format("sequence_test",sequence_test))
 print('{}: {}'.format("running_sequences",running_sequences))
+
+
+
+graph = x_and_y_or_z_tree.get_graph("x_and_y_or_z_tree.png")
+
+graph.view()

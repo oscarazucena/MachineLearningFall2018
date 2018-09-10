@@ -1,70 +1,107 @@
 import numpy as np
 import pandas as pd
 from enum import Enum
-class TEST(Enum):
-    EQUAL = 1
-    LESS = 2
-    GREAT = 3
-class TestOperator:
-    def __init__(self,operator : TEST):
-        self.operator = operator
-        self.value = None
-
-    def set_value(self,value):
-        self.value = value
-
-    def test(self,value):
-        if self.operator == TEST.EQUAL:
-            return value == self.value
-        if self.operator == TEST.LESS:
-            return value <= self.value
-        return value > self.value
-
-class Test:
-    def __init__(self, value, test_operator : TestOperator = TestOperator(TEST.EQUAL)):
-        self.value = value
-        self.test_operator = test_operator
-        if self.test_operator.value == None:
-            self.test_operator.set_value(value)
-
-    def test(self,value):
-        return self.test_operator.test(value)
-
+from graphviz import Digraph
 
 class TreeNode:
-    # TreeNode node to keep track of the different nodes
-    def __init__(self,attribute, value: str, label: str = ""):
+    """
+    Class for containing the decision nodes for a decision tree
+    """
+    def __init__(self,attribute, value, total_count, label = ""):
         self.attribute = attribute
         self.value = value
         self.label = label
+        self.count = total_count
         self.nodes = {}
+        self.gain = 0
 
     @property
     def is_leaf(self):
-    #property to tell if the node is a leaf or not
+        """
+        property identify if tree is a leaf or not
+        """
         if len(self.nodes) == 0:
             return True
         return False
 
+    def set_gain(self,gain):
+        """
+        sets the node gain
+        @param gain: node gain, calculate at time of training
+        """
+        self.gain = gain
+
+    def set_positve_label_and_count(self,label,count):
+        """
+        sets the positive label and count
+        @param label: label that has the positive outcome
+        @param count: count of current positive outcome
+        """
+        self.positve_label = label
+        self.positve_count = count
+
+    def set_negative_label_and_count(self,label,count):
+        """
+        sets the negative label and count
+        @param label: label that has the negative outcome
+        @param count: count of current negative outcome
+        """
+        self.negative_label = label
+        self.negative_count = count
+
     def add_node(self, value, node):
-    #add_node adds a child node the current node
+        """
+        add new child node to this node
+        :param value: key to address the node
+        :param node:  child node to add
+        """
         self.nodes[value] = node
 
     def get_node(self, value):
-    #get_node adds get a child node key by value
+        """
+        get child node base on value
+        @param self:
+        @param value: key to address node
+        @return: the child node who's key is value
+        """
         if value in self.nodes:
             return
         return self.nodes[value]
 
     def to_string(self, level = 0):
-    #to_string string representation with parent node printed first followed by child nodes
+        """
+        convert node to string further appending children if any
+        @param level: lab level
+        @return: string representing the current node
+        """
         ret = "\t"*level+repr(self.attribute)+": "+repr(self.value)+": "+repr(self.label)+"\n"
         for node in self.nodes:
             ret += self.nodes[node].to_string(level+1)
         return ret
 
+    def edge_name(self):
+        """
+        returns the edge name to use for visualing the node
+        @return: the string represeting only the current node
+        """
+        ret = repr(self.attribute)+"=" + repr(self.value)
+        ret += "\ncount="+repr(self.count)
+        if not self.positve_label == None:
+            ret += "\n" + repr(self.positve_label) + "=" + repr(self.positve_count)
+        if not self.negative_label == None:
+            ret += "\n" + repr(self.negative_label) + "=" + repr(self.negative_count)
+        if not self.gain == None:
+            ret += "\ngain="+repr(self.gain)
+        if self.is_leaf:
+            ret += "\nvalue="+repr(self.label)
+        return ret
+
     def get_result(self,case):
-    #get_result returns the results from the input case
+        """
+        returns the resulst of running the test case case
+        :param case: test case to continue running
+        :return: the results of running the test case including propatating down the the children
+        """
         if self.is_leaf :
             return self.label
         for node in self.nodes:
@@ -72,71 +109,152 @@ class TreeNode:
                 return self.nodes[node].get_result(case)
         return self.label
 
+    def add_edge(self,g ,mine_name):
+        count = 0
+        g.node(mine_name, self.edge_name())
+        for node in self.nodes:
+            g.edge(mine_name,mine_name + repr(count))
+            self.nodes[node].add_edge(g,mine_name + repr(count))
+            count += 1
+
+    def copy(self):
+        copy = TreeNode( self.attribute, self.value, self.count,self.label)
+        copy.set_gain(self.gain)
+        copy.set_negative_label_and_count(self.negative_label,self.negative_count)
+        copy.set_positve_label_and_count(self.positve_label,self.positve_count)
+        for node in self.nodes:
+            copy.add_node(node,self.nodes[node].copy())
+        return copy
+
+    def get_child_count(self):
+        count = 0
+        for node in self.nodes:
+            count += 1 + self.nodes[node].get_child_count()
+        return count
+    def get_max_depth(self):
+        """
+        returns the max depth from the current to node to the next leaf node
+        @return: the max depth from the current to node to the next leaf node
+        """
+        depth = 1
+        for node in self.nodes:
+            depth  = max(depth,1+self.nodes[node].get_max_depth())
+        return depth
 
 class ID3Tree:
     # ID3Tree class implementation of ID3 decision tree
 
-    def __init__(self, examples, attributes : pd.DataFrame, target_column, positive_label, negative_label,name):
+    def __init__(self, attributes, target_column, positive_label, negative_label,name,stop_depth = 100):
         # initializes the ID3 with examples, attributes, target_column, positive_label, negative_label, and name
-        self.examples = examples
         self.attributes = attributes
         self.positive_label = positive_label
         self.negative_label = negative_label
         self.target_column = target_column
-        self.root_node = TreeNode("root", self.positive_label)
         self.name = name
+        self.debug_statement=False
+        self.stop_depth = stop_depth
 
+    def stop(self,current_depth):
+        return current_depth >= self.stop_depth
 
-    def train(self):
+    def fit(self,examples):
     # train call this to train given the current exampples attribues
-        self.root_node = self.reduce(self.examples, "root","root", self.attributes)
+        total_count = examples[self.target_column].count()
+        self.root_node = TreeNode("root", self.positive_label,total_count)
+        target_attribute_positive = examples[examples[self.target_column] == self.positive_label][self.target_column].count()
+        target_attribute_negative = examples[examples[self.target_column] == self.negative_label][self.target_column].count()
+        self.root_node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+        self.root_node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+        self.examples = examples
+        self.root_node = self.reduce(examples, "root","root", self.attributes,0)
 
-    def print(self):
+    def get_graph(self,filename):
+        g = Digraph('G', filename=filename,format='pdf')
+        self.root_node.add_edge(g,"0")
+        return g
+
+    def print_tree(self):
+        """
+        prints the information of the current three
+        """
         print(self.root_node.to_string())
 
-    def reduce(self, examples, target_attribute,attribute_value, attributes):
+    def reduce(self, examples, target_attribute,attribute_value, attributes,current_depth,tab=1):
         # reduce recursive function to call for training the tree
 
         # count the positives and negatives
-        target_attribute_positive = examples[examples[self.target_column] == self.positive_label].count()[self.target_column]
-        target_attribute_negative = examples[examples[self.target_column] == self.negative_label].count()[self.target_column]
-        has_positive = target_attribute_positive > 0
-        has_negative = target_attribute_negative > 0
+        target_attribute_positive = examples[examples[self.target_column] == self.positive_label][self.target_column].count()
+        target_attribute_negative = examples[examples[self.target_column] == self.negative_label][self.target_column].count()
+        total_count = examples[self.target_column].count()
+        has_only_positive = target_attribute_positive == total_count
+        has_only_negative = target_attribute_negative == total_count
 
-        #print('{}: {}'.format("has_positive",has_positive))
-        #print('{}: {}'.format("has_negative",has_negative))
+        if self.debug_statement:
+            print("\t"*tab+'{}: {}'.format("total_count",total_count))
+            print("\t"*tab+'{}: {}'.format("target_attribute_positive",target_attribute_positive))
+            print("\t"*tab+'{}: {}'.format("target_attribute_negative",target_attribute_negative))
+            print("\t"*tab+'{}: {}'.format("has_only_positive",has_only_positive))
+            print("\t"*tab+'{}: {}'.format("has_only_negative",has_only_negative))
         # if only positives or negatives are left or attributes are empty return with root
-        if not (has_positive and has_negative) or len(attributes) == 0:
-            if has_positive:
-                return TreeNode(target_attribute,attribute_value, self.positive_label)
 
-            if has_negative:
-                return TreeNode(target_attribute,attribute_value, self.negative_label)
+        if has_only_positive:
+            node = TreeNode(target_attribute,attribute_value, total_count,self.positive_label)
+            node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+            node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+            node.set_gain(0)
+            return node
 
-            max_key = self.positive_label
-            if target_attribute_negative > target_attribute_positive:
-                max_key = self.negative_label
+        if has_only_negative:
+            node = TreeNode(target_attribute,attribute_value, total_count, self.negative_label)
+            node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+            node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+            node.set_gain(0)
+            return node
 
-            return TreeNode(target_attribute,attribute_value, max_key)
+        max_key = self.positive_label
+        if target_attribute_negative > target_attribute_positive:
+            max_key = self.negative_label
 
+        if len(attributes) == 0:
+            node = TreeNode(target_attribute,attribute_value,total_count, max_key)
+            node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+            node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+            node.set_gain(0)
+            return node
+
+        if self.stop(current_depth) :
+            node = TreeNode(target_attribute,attribute_value,total_count, max_key)
+            node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+            node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+            node.set_gain(0)
+            return node
+
+        if self.debug_statement:
+            print("\t"*tab+'{}: {}'.format("continue: ",target_attribute))
         #determine with attribute to split on
-        attribute_to_split_on = self.find_attribute_to_split_on(attributes,examples)
+        attribute_to_split_on,gain = self.find_attribute_to_split_on(attributes,examples)
 
         values_to_split_on = attributes[attribute_to_split_on]
 
         #recursively call reduce to train for each value in the target attribute
-        node = TreeNode(target_attribute,attribute_value)
+        node = TreeNode(target_attribute,attribute_value,total_count)
+        node.set_positve_label_and_count(self.positive_label,target_attribute_positive)
+        node.set_negative_label_and_count(self.negative_label,target_attribute_negative)
+        node.set_gain(gain)
+
         for value in values_to_split_on:
-            test = TestOperator(TEST.EQUAL)
-            test.set_value(value)
             examples_with_value = get_examples_with_value(examples, attribute_to_split_on, value)
             temp_attributes = dict(attributes)
             #remove attribute to split on if is not numberic
             del temp_attributes[attribute_to_split_on]
-            temp_node = self.reduce(examples_with_value,attribute_to_split_on,value,temp_attributes)
-            node.add_node(value,temp_node)
+            child_node = self.reduce(examples_with_value,attribute_to_split_on,value,temp_attributes,current_depth+1,tab+1)
+            self.add_node(node,value,child_node)
 
         return node
+
+    def add_node(self,parent,value,child):
+        parent.add_node(value,child)
+
 
     def find_attribute_to_split_on(self, attributes, examples):
         attribute_to_split_on = None
@@ -148,7 +266,9 @@ class ID3Tree:
                 max_gain = gain
                 attribute_to_split_on = attribute
 
-        return attribute_to_split_on
+        return attribute_to_split_on,max_gain
+
+
     def get_gain_from_best_partition(self, attribute, examples):
         df = examples.sort_values(attribute)
         data_array = df[self.target_column].tolist()
@@ -186,6 +306,80 @@ class ID3Tree:
         #get_result returns results by iterating through each node give the case
         return self.root_node.get_result(case)
 
+    def get_number_of_nodes(self):
+        return self.root_node.get_child_count()
+
+    def get_max_depth(self):
+        return self.root_node.get_max_depth()
+
+    def copy(self):
+        return self.root_node.copy()
+
+    def prune(self, cross_validate):
+        root_node_copy = self.copy()
+        self.root_node = self.prune_helper(root_node_copy,cross_validate,root_node_copy)
+
+    def prune_helper(self,node,cross_validate,root_node):
+        all_childs_are_leaves = True
+        if not node.is_leaf:
+            for child_node in node.nodes:
+                node.nodes[child_node] = self.prune_helper(node.nodes[child_node],cross_validate,root_node)
+                all_childs_are_leaves = all_childs_are_leaves and node.nodes[child_node].is_leaf
+
+        if all_childs_are_leaves:
+
+            total = 0
+            correct = 0
+            for index, row in cross_validate.iterrows():
+                result = self.get_result(row)
+                if result == row[self.target_column]:
+                    correct += 1
+                total += 1
+            percent_correct = 0
+            if not total == 0:
+                percent_correct = correct/total
+
+            copy = node.copy()
+            node.nodes = []
+            node.label = self.positive_label
+            total = 0
+            correct = 0
+            for index, row in cross_validate.iterrows():
+                result = root_node.get_result(row)
+                if result == row[self.target_column]:
+                    correct += 1
+                total += 1
+            percent_correct_positive = 0
+            if not total == 0:
+                percent_correct_positive = correct/total
+
+            node.label = self.negative_label
+            total = 0
+            correct = 0
+            for index, row in cross_validate.iterrows():
+                result = root_node.get_result(row)
+                if result == row[self.target_column]:
+                    correct += 1
+                total += 1
+            percent_correct_negative = 0
+            if not total == 0:
+                percent_correct_negative = correct/total
+
+            if self.debug_statement:
+                print('{}: {} {}'.format("pruning: ",node.attribute, node.value))
+                print('{}: {}'.format("percent_correct_negative: ",percent_correct_negative))
+                print('{}: {}'.format("percent_correct_positive: ",percent_correct_positive))
+                print('{}: {}'.format("percent_correct: ",percent_correct))
+
+            if percent_correct_negative >= percent_correct or percent_correct_positive >= percent_correct:
+                if percent_correct_negative > percent_correct_positive:
+                    node.value = self.negative_label
+                else:
+                    node.value = self.positive_label
+            else:
+                node = copy
+
+        return node
 
 def get_examples_with_value(examples, attribute, value):
     examples_with_value = examples[examples[attribute] == value]

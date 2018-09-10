@@ -2,6 +2,13 @@ import pandas as pd
 import numpy as np
 from sklearn import tree
 
+from sklearn.externals.six import StringIO
+from IPython.display import Image, display
+from sklearn.tree import export_graphviz
+import pydotplus
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
 def remap_data(data_row,values) :
     row_values = []
     for data in data_row:
@@ -38,7 +45,9 @@ titanic_test = dfs[1]
 
 target = "Survived"
 
-features = ["Pclass", "SibSp", "Parch","Age",'Fare']
+features = ["Pclass", "SibSp", "Parch"]
+
+features_names = ["Pclass", "SibSp", "Parch","SexValues","EmbarkedValues"]
 
 #change EmbarkedData
 embarked_values = titanic_train["Embarked"].unique().tolist()
@@ -124,3 +133,25 @@ test_results = titanic_tree.predict(test_data)
 test_prediction_rate = get_correct_ratio(test_results,test_survived)
 
 print('{} : {}'.format("test_prediction_rate",test_prediction_rate))
+
+dot_data = StringIO()
+
+export_graphviz(titanic_tree, out_file=dot_data,
+                filled=True, rounded=True,
+                special_characters=True, feature_names=titanic_data_features.columns.values, class_names=["Died","Survived"])
+
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+
+graph.write_png('tree.png')
+
+png_str = graph.create_png(prog='dot')
+
+# treat the dot output string as an image file
+sio = StringIO()
+sio.write(png_str)
+sio.seek(0)
+img = mpimg.imread(sio)
+
+# plot the image
+imgplot = plt.imshow(img, aspect='equal')
+plt.show(block=False)
